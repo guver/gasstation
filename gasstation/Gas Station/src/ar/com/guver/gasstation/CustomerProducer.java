@@ -13,14 +13,14 @@ public class CustomerProducer implements Runnable {
 	public CustomerProducer (BlockingQueue<GasRequest> sharedQueue, long duration)
 	{
 		this.customerQueue = sharedQueue; 
-		this.duration = duration;
+		this.duration = duration * 1000;
 	}
 
 	@Override
 	public void run() {
-		long startTime = System.nanoTime();
+		long startTime = System.currentTimeMillis();
 		//Every certain X time generate a customer gas request and put it into the queue
-		while (duration < startTime  - System.nanoTime())
+		while (duration < startTime  - System.currentTimeMillis())
 		{
 			GasRequest randomRequest = generateRandomRequest();
 			try {
@@ -28,15 +28,14 @@ public class CustomerProducer implements Runnable {
 				}
 			catch (InterruptedException ex)
 			{
-				//do nothing
+				//do nothing since no cleanup needed. Just sleep for a bit and then try again.
 			}
 			
 			//Wait random time for next customer to show up, between 1 to 10 seconds
 			try {
 				Thread.sleep (ThreadLocalRandom.current().nextInt(1000, 10000));
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			} catch (InterruptedException ex) {
+				// do nothing
 			}
 		}
 	}
