@@ -7,22 +7,22 @@ import net.bigpoint.assessment.gasstation.GasType;
 
 public class CustomerProducer implements Runnable {
 
-	private final BlockingQueue<GasRequest> customerQueue;
-	long duration;
+	private final BlockingQueue<CustomerRequest> customerQueue;
+	long maximumDuration;
 	
-	public CustomerProducer (BlockingQueue<GasRequest> sharedQueue, long duration)
+	public CustomerProducer (BlockingQueue<CustomerRequest> sharedQueue, long duration)
 	{
 		this.customerQueue = sharedQueue; 
-		this.duration = duration * 1000;
+		this.maximumDuration = duration * 60 * 1000;
 	}
 
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
 		//Every certain X time generate a customer gas request and put it into the queue
-		while (duration < startTime  - System.currentTimeMillis())
+		while (maximumDuration > System.currentTimeMillis() - startTime)
 		{
-			GasRequest randomRequest = generateRandomRequest();
+			CustomerRequest randomRequest = generateRandomRequest();
 			try {
 				customerQueue.put(randomRequest);
 				}
@@ -35,12 +35,12 @@ public class CustomerProducer implements Runnable {
 			try {
 				Thread.sleep (ThreadLocalRandom.current().nextInt(1000, 10000));
 			} catch (InterruptedException ex) {
-				// do nothing
+				//do nothing
 			}
 		}
 	}
 
-	private GasRequest generateRandomRequest() {
+	private CustomerRequest generateRandomRequest() {
 		// Generate a random gas amount, price to pay and type of gas wanted.
 		
 		//Gastype is calculated in random distribution. Given there are 3 types of gas
@@ -70,7 +70,7 @@ public class CustomerProducer implements Runnable {
 		double extremes = basePrice * 0.08;
 		double maxPricePerLiter = middleLine + ThreadLocalRandom.current().nextDouble((-1.0 * extremes),extremes);
 		
-		GasRequest request = new GasRequest(type, amountInLiters, maxPricePerLiter);
+		CustomerRequest request = new CustomerRequest(type, amountInLiters, maxPricePerLiter);
 		
 		return request;
 	}

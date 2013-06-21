@@ -19,20 +19,21 @@ public class GameStart {
 	
 	//Ask for amount of gas in each pump, and price of each gas type -> Create pumps
 	
-	public static void main()
+	public static void main(String args[])
 	{
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-		BlockingQueue<GasRequest> customerQueue = new LinkedBlockingQueue<GasRequest>();
+		BlockingQueue<CustomerRequest> customerQueue = new LinkedBlockingQueue<CustomerRequest>(10);
 		RealGasStation myGasStation = new RealGasStation(customerQueue);
 		boolean inputCorrect = false;
 		for (GasType type : GasType.values())
 		{
 			double amount = 0.0;
 			//Capture the size of the pump
+			inputCorrect = false;
 			while(inputCorrect == false)
 			{
 				inputCorrect = true;
-				System.out.format("How big would you want your pump of %s to be (please format as number.number):", type.toString());	
+				System.out.printf("How big would you want your pump of %s to be (please format as number.number):", type.toString());	
 				try {
 					String amountString = in.readLine();
 					amount = Double.parseDouble(amountString);	
@@ -58,7 +59,7 @@ public class GameStart {
 			while(inputCorrect == false)
 			{
 				inputCorrect = true;
-				System.out.format("What is the price of your %s (please format as number.number):", type.toString());	
+				System.out.printf("What is the price of your %s (please format as number.number):", type.toString());	
 				try {
 					String priceString = in.readLine();
 					price = Double.parseDouble(priceString);	
@@ -95,24 +96,31 @@ public class GameStart {
 		
 		//Generate a thread for gasstation consumer.
 		//Generate a thread for customer requests producer.
-		ExecutorService customerProducer = Executors.newSingleThreadExecutor();
+		//ExecutorService customerProducer = Executors.newSingleThreadExecutor();
+		
 		Runnable customerProducerRunnable = new CustomerProducer(customerQueue, duration);
-		customerProducer.submit(customerProducerRunnable);
+		Thread customerProducer = new Thread(customerProducerRunnable);
+		customerProducer.start();
 		
-		ExecutorService gasStationConsumer = Executors.newSingleThreadExecutor();
-		gasStationConsumer.submit(myGasStation);
+		//customerProducer.submit(customerProducerRunnable);
 		
-		customerProducer.shutdown();
+		//ExecutorService gasStationConsumer = Executors.newSingleThreadExecutor();
+		Thread gasStationConsumer = new Thread(myGasStation);
+		gasStationConsumer.start();
+		
+		//gasStationConsumer.submit(myGasStation);
+		
 		try {
-			customerProducer.awaitTermination(60, TimeUnit.SECONDS);
+			customerProducer.join();
 		} catch (InterruptedException e) {
-			customerProducer.shutdownNow();
+			customerProducer.interrupt();
 		}
 		
-		
+		System.out.printf("Total revenue is: %f \n", myGasStation.getRevenue());
+		System.out.printf("Total number of sales are: %d \n", myGasStation.getNumberOfSales());
+		System.out.printf("Total cancellations because of no gas are: %d \n", myGasStation.getNumberOfCancellationsNoGas());
+		System.out.printf("Total number of cancellation because of gas too expensive: %d \n", myGasStation.getNumberOfCancellationsTooExpensive());
+		gasStationConsumer.interrupt();
+		return;
 	}
-	
-	
-	
-	
 }

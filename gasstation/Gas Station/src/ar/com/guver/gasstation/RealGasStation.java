@@ -33,10 +33,10 @@ public class RealGasStation implements GasStation, Runnable {
 	Map<GasType, GasPump> stationGasPumps = Collections.synchronizedMap(new EnumMap<GasType, GasPump>(GasType.class));
 	
 	EnumMap<GasType, Double> typePriceMap = new EnumMap<>(GasType.class);
-	private BlockingQueue<GasRequest> customerQueue;
+	private final BlockingQueue<CustomerRequest> customerQueue;
 	ExecutorService gasRequestExecutor = Executors.newFixedThreadPool(size);
 	
-	public RealGasStation (BlockingQueue<GasRequest> sharedQueue){
+	public RealGasStation (BlockingQueue<CustomerRequest> sharedQueue){
 		this.customerQueue = sharedQueue;
 		cancellationsNoGas = 0;
 		cancellationsTooExpensive = 0;
@@ -54,37 +54,10 @@ public class RealGasStation implements GasStation, Runnable {
 		return stationGasPumps.values();
 	}
 
-	public double buyGas(GasRequest request) throws GasTooExpensiveException, NotEnoughGasException {
-				
-		double revenue = 0;
-		request = associateGasPumpForRequest(request);
-		if (request.getMaxPrice() < typePriceMap.get(request.getType()))
-		{
-			//The price of the gas is higher than customer is willing to pay
-			throw new GasTooExpensiveException();
-		}
-		Future<Double> amountResponse = gasRequestExecutor.submit(request);
-		try 
-		{
-		   revenue = amountResponse.get() * typePriceMap.get(request.getType());
-		} catch (ExecutionException ex) {
-			Throwable t = ex.getCause();
-			if (t instanceof NotEnoughGasException){
-				throw (NotEnoughGasException)t;
-			}
-			else {
-				//something strange happened cause we should not be here
-			}
-		} catch (InterruptedException ex) {
-			//do nothing.
-		}
-	return revenue;
-	}
-
 	private GasRequest associateGasPumpForRequest(GasRequest request) {
 		GasPump pump = stationGasPumps.get(request.getType());
 		request.setPump(pump);
-		return null;
+		return request;
 	}
 
 	@Override
@@ -127,18 +100,19 @@ public class RealGasStation implements GasStation, Runnable {
 		// CustomerProducer. 
 		while (!Thread.interrupted())
 		try {
-			GasRequest request = customerQueue.take();
-			double revenue = buyGas(request); //Changing to request
+			CustomerRequest request = customerQueue.take();
+			double revenue = buyGas(request.getType(),request.getAmount(),request.getMaxPrice()); 
 			totalRevenue += revenue;
 			if (revenue > 0)
 			{
 				numberOfSales++;
 			}
 		} catch (GasTooExpensiveException ex) {
-			cancellationsNoGas++;
-		} catch (NotEnoughGasException ex) {
 			cancellationsTooExpensive++;
+		} catch (NotEnoughGasException ex) {
+			cancellationsNoGas++;
 		} catch (InterruptedException ex) {
+			gasRequestExecutor.shutdown();
 			return;
 		}
 	}
@@ -147,8 +121,29 @@ public class RealGasStation implements GasStation, Runnable {
 	public double buyGas(GasType type, double amountInLiters,
 			double maxPricePerLiter) throws NotEnoughGasException,
 			GasTooExpensiveException {
-		// This one should not be called.
-		return 0;
+		double revenue = 0;
+		GasRequest request = new GasRequest(type, amountInLiters, maxPricePerLiter);
+		request = associateGasPumpForRequest(request);
+		if (request.getMaxPrice() < typePriceMap.get(request.getType()))
+		{
+			//The price of the gas is higher than customer is willing to pay
+			throw new GasTooExpensiveException();
+		}
+		Future<Double> amountResponse = gasRequestExecutor.submit(request);
+		try 
+		{
+		   revenue = amountResponse.get() * typePriceMap.get(request.getType());
+		} catch (ExecutionException ex) {
+			Throwable t = ex.getCause();
+			if (t instanceof NotEnoughGasException){
+				throw (NotEnoughGasException)t;
+			}
+			else {
+				//something strange happened cause we should not be here
+			}
+		} catch (InterruptedException ex) {
+			//do nothing.
+		}
+	return revenue;
 	}
-	
 }
